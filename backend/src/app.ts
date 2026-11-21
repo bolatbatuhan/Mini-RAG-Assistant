@@ -6,15 +6,18 @@ import {
   createSupabaseDocumentRepository,
   type DocumentRepository,
 } from './repositories/documentRepo.js';
+import { createChatRouter } from './routes/chat.js';
 import { createDocumentsRouter } from './routes/documents.js';
 import { createGeminiAIService, type AIService } from './services/ai.js';
 import { createIngestionService, type IngestionService } from './services/ingestion.js';
+import { createRagService, type RagService } from './services/rag.js';
 
 export interface AppDependencies {
   verifyToken?: TokenVerifier;
   documentRepo?: DocumentRepository;
   aiService?: AIService;
   ingestionService?: IngestionService;
+  ragService?: RagService;
   maxUploadSizeMb?: number;
 }
 
@@ -36,6 +39,7 @@ export function createApp(deps: AppDependencies = {}): Express {
   let cachedRepo: DocumentRepository | undefined = deps.documentRepo;
   let cachedAI: AIService | undefined = deps.aiService;
   let cachedIngestion: IngestionService | undefined = deps.ingestionService;
+  let cachedRag: RagService | undefined = deps.ragService;
 
   const getDocumentRepo = (): DocumentRepository => {
     if (!cachedRepo) {
@@ -61,6 +65,16 @@ export function createApp(deps: AppDependencies = {}): Express {
     return cachedIngestion;
   };
 
+  const getRagService = (): RagService => {
+    if (!cachedRag) {
+      cachedRag = createRagService({
+        repo: getDocumentRepo(),
+        ai: getAIService(),
+      });
+    }
+    return cachedRag;
+  };
+
   const authMiddleware = createAuthMiddleware(deps.verifyToken ?? defaultTokenVerifier);
 
   app.use(
@@ -70,6 +84,14 @@ export function createApp(deps: AppDependencies = {}): Express {
       getDocumentRepo,
       getIngestionService,
       maxUploadSizeMb: deps.maxUploadSizeMb,
+    })
+  );
+
+  app.use(
+    '/api/chat',
+    authMiddleware,
+    createChatRouter({
+      getRagService,
     })
   );
 
