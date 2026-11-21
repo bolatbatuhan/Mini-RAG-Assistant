@@ -17,3 +17,17 @@ Thumbs.db
 
 # Coverage
 coverage/
+# AI Agent & Local Plans ()
+.agent/
+docs/plans/
+PROJECT_BRIEF.md
+
+# Uploads / Temp PDF files ()
+uploads/
+tmp/
+*.pdf
+!README*.pdf
+
+# IDE / Editor
+.vscode/
+.idea/
