@@ -108,7 +108,7 @@ describe('createGeminiAIService (official GenAI v1beta REST endpoint)', () => {
     );
   });
 
-  it('calls gemini-2.5-flash:generateContent and extracts grounded answer text', async () => {
+  it('calls gemini-3.8-flash:generateContent (auto-upgrading legacy gemini-2.5-flash) and extracts grounded answer text', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -144,7 +144,7 @@ describe('createGeminiAIService (official GenAI v1beta REST endpoint)', () => {
 
     expect(answer).toBe('Authentication uses Supabase JWT tokens.');
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
       expect.objectContaining({
         method: 'POST',
         headers: {

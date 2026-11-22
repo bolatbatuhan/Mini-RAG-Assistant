@@ -9,7 +9,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_EMBEDDING_MODEL: z.string().default('gemini-embedding-001'),
-  GEMINI_CHAT_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_CHAT_MODEL: z.string().default('gemini-3.8-flash'),
   MAX_UPLOAD_SIZE_MB: z.coerce.number().positive().default(10),
 });
 

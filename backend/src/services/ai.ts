@@ -60,8 +60,11 @@ function resolveEmbeddingModel(rawModel?: string): string {
 }
 
 function resolveChatModel(rawModel?: string): string {
-  const cleaned = (rawModel ?? 'gemini-2.5-flash').trim().replace(/^models\//, '');
-  return cleaned || 'gemini-2.5-flash';
+  const cleaned = (rawModel ?? 'gemini-3.8-flash').trim().replace(/^models\//, '');
+  if (!cleaned || cleaned === 'gemini-2.5-flash') {
+    return 'gemini-3.8-flash';
+  }
+  return cleaned;
 }
 
 export function buildRagPrompt(question: string, chunks: RetrievedChunk[]): string {
@@ -149,44 +152,58 @@ export function createGeminiAIService(options: GeminiAIServiceOptions = {}): AIS
 
     async generateAnswer(question: string, contextChunks: RetrievedChunk[]): Promise<string> {
       const prompt = buildRagPrompt(question, contextChunks);
-      const url = `${GEMINI_API_BASE_URL}/${encodeURIComponent(chatModel)}:generateContent`;
+      const candidateModels = Array.from(
+        new Set([chatModel, 'gemini-3.5-flash', 'gemini-3.5-flash-lite'])
+      );
 
-      const response = await fetchFn(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
+      let lastError = 'Unknown Gemini chat error';
+
+      for (let i = 0; i < candidateModels.length; i++) {
+        const currentModel = candidateModels[i]!;
+        const url = `${GEMINI_API_BASE_URL}/${encodeURIComponent(currentModel)}:generateContent`;
+
+        const response = await fetchFn(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
           },
-        }),
-      });
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: prompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+            },
+          }),
+        });
 
-      const data = (await response.json()) as GeminiGenerateContentResponse;
+        const data = (await response.json()) as GeminiGenerateContentResponse;
 
-      if (!response.ok) {
-        const apiMsg = data?.error?.message ?? `HTTP ${response.status}`;
-        throw new Error(`Gemini chat completion failed: ${apiMsg}`);
+        if (!response.ok) {
+          lastError = data?.error?.message ?? `HTTP ${response.status}`;
+          if (response.status === 503 && i < candidateModels.length - 1) {
+            continue;
+          }
+          throw new Error(`Gemini chat completion failed: ${lastError}`);
+        }
+
+        const answer = (data?.candidates?.[0]?.content?.parts ?? [])
+          .map((part) => part.text ?? '')
+          .join('')
+          .trim();
+
+        if (!answer) {
+          throw new Error('Gemini returned an empty answer');
+        }
+
+        return answer;
       }
 
-      const answer = (data?.candidates?.[0]?.content?.parts ?? [])
-        .map((part) => part.text ?? '')
-        .join('')
-        .trim();
-
-      if (!answer) {
-        throw new Error('Gemini returned an empty answer');
-      }
-
-      return answer;
+      throw new Error(`Gemini chat completion failed: ${lastError}`);
     },
   };
 }
