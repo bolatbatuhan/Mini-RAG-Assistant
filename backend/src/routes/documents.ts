@@ -1,4 +1,4 @@
-import { Router, type NextFunction, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import multer, { MulterError } from 'multer';
 import type { DocumentRepository } from '../repositories/documentRepo.js';
 import { IngestionError, type IngestionService } from '../services/ingestion.js';
@@ -14,6 +14,7 @@ export interface DocumentsRouterDeps {
   getDocumentRepo: () => DocumentRepository;
   getIngestionService: () => IngestionService;
   maxUploadSizeMb?: number;
+  uploadRateLimiter?: RequestHandler;
 }
 
 function isPdfMagicHeader(buffer: Buffer): boolean {
@@ -68,48 +69,56 @@ export function createDocumentsRouter(deps: DocumentsRouterDeps): Router {
     });
   };
 
-  router.post('/', handleUploadMiddleware, async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
+  const noopMiddleware: RequestHandler = (_req, _res, next) => next();
+  const rateLimitUpload = deps.uploadRateLimiter ?? noopMiddleware;
 
-    if (!req.file) {
-      res.status(400).json({ error: 'PDF file is required' });
-      return;
-    }
-
-    if (!isPdfMagicHeader(req.file.buffer)) {
-      res.status(400).json({ error: 'Invalid PDF file content' });
-      return;
-    }
-
-    try {
-      const ingestionService = deps.getIngestionService();
-      const result = await ingestionService.ingestPdf({
-        userId,
-        filename: req.file.originalname,
-        buffer: req.file.buffer,
-      });
-
-      res.status(201).json({
-        document: result.document,
-        chunkCount: result.chunkCount,
-      });
-    } catch (err) {
-      if (err instanceof IngestionError) {
-        res.status(422).json({
-          error: err.message,
-          documentId: err.documentId,
-        });
+  router.post(
+    '/',
+    rateLimitUpload,
+    handleUploadMiddleware,
+    async (req: Request, res: Response) => {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
         return;
       }
-      res.status(500).json({
-        error: err instanceof Error ? err.message : 'Failed to process document',
-      });
+
+      if (!req.file) {
+        res.status(400).json({ error: 'PDF file is required' });
+        return;
+      }
+
+      if (!isPdfMagicHeader(req.file.buffer)) {
+        res.status(400).json({ error: 'Invalid PDF file content' });
+        return;
+      }
+
+      try {
+        const ingestionService = deps.getIngestionService();
+        const result = await ingestionService.ingestPdf({
+          userId,
+          filename: req.file.originalname,
+          buffer: req.file.buffer,
+        });
+
+        res.status(201).json({
+          document: result.document,
+          chunkCount: result.chunkCount,
+        });
+      } catch (err) {
+        if (err instanceof IngestionError) {
+          res.status(422).json({
+            error: err.message,
+            documentId: err.documentId,
+          });
+          return;
+        }
+        res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to process document',
+        });
+      }
     }
-  });
+  );
 
   router.get('/', async (req: Request, res: Response) => {
     const userId = req.user?.id;

@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
-  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  ALLOWED_ORIGIN: z.string().default('http://localhost:5173'),
+  CORS_ORIGIN: z.string().optional(),
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
   SUPABASE_ANON_KEY: z.string().min(1, 'SUPABASE_ANON_KEY is required'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
@@ -21,7 +22,12 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): Env {
     return cachedEnv;
   }
 
-  const parsed = envSchema.safeParse(rawEnv);
+  const normalizedEnv = {
+    ...rawEnv,
+    ALLOWED_ORIGIN: rawEnv.ALLOWED_ORIGIN ?? rawEnv.CORS_ORIGIN ?? 'http://localhost:5173',
+  };
+
+  const parsed = envSchema.safeParse(normalizedEnv);
   if (!parsed.success) {
     const details = parsed.error.issues
       .map((issue) => `${issue.path.join('.')}: ${issue.message}`)

@@ -3,7 +3,12 @@ import { z } from 'zod';
 import type { RagService } from '../services/rag.js';
 
 const chatRequestSchema = z.object({
-  question: z.string().trim().min(1, 'Question must not be empty').max(2000, 'Question is too long'),
+  question: z
+    .string()
+    .trim()
+    .min(1, 'Question must not be empty')
+    .max(2000, 'Question is too long'),
+  documentId: z.string().trim().min(1).optional(),
 });
 
 export interface ChatRouterDeps {
@@ -29,7 +34,11 @@ export function createChatRouter(deps: ChatRouterDeps): Router {
 
     try {
       const ragService = deps.getRagService();
-      const result = await ragService.answerQuestion(userId, parsed.data.question);
+      const result = await ragService.answerQuestion(
+        userId,
+        parsed.data.question,
+        parsed.data.documentId ? { documentId: parsed.data.documentId } : undefined
+      );
       res.status(200).json(result);
     } catch (err) {
       res.status(500).json({

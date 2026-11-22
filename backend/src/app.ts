@@ -1,5 +1,11 @@
 import cors from 'cors';
-import express, { type Express } from 'express';
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { createAuthMiddleware, defaultTokenVerifier, type TokenVerifier } from './middleware/auth.js';
 import {
@@ -12,6 +18,13 @@ import { createGeminiAIService, type AIService } from './services/ai.js';
 import { createIngestionService, type IngestionService } from './services/ingestion.js';
 import { createRagService, type RagService } from './services/rag.js';
 
+class CorsNotAllowedError extends Error {
+  constructor(message = 'Not allowed by CORS') {
+    super(message);
+    this.name = 'CorsNotAllowedError';
+  }
+}
+
 export interface AppDependencies {
   verifyToken?: TokenVerifier;
   documentRepo?: DocumentRepository;
@@ -19,15 +32,39 @@ export interface AppDependencies {
   ingestionService?: IngestionService;
   ragService?: RagService;
   maxUploadSizeMb?: number;
+  allowedOrigin?: string;
+  enableRateLimit?: boolean;
+  rateLimitMax?: number;
+}
+
+function parseAllowedOrigins(rawOrigin: string): string[] {
+  return rawOrigin
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
 }
 
 export function createApp(deps: AppDependencies = {}): Express {
   const app = express();
 
+  const rawAllowedOrigin =
+    deps.allowedOrigin ??
+    process.env.ALLOWED_ORIGIN ??
+    process.env.CORS_ORIGIN ??
+    'http://localhost:5173';
+  const allowedOrigins = parseAllowedOrigins(rawAllowedOrigin);
+
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
+      origin: (requestOrigin, callback) => {
+        if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new CorsNotAllowedError('Not allowed by CORS'));
+      },
+      credentials: true,
     })
   );
   app.use(express.json({ limit: '1mb' }));
@@ -75,6 +112,22 @@ export function createApp(deps: AppDependencies = {}): Express {
     return cachedRag;
   };
 
+  const shouldSkipRateLimit = () =>
+    process.env.NODE_ENV === 'test' && !deps.enableRateLimit;
+
+  const aiEndpointLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: deps.rateLimitMax ?? 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+    skip: shouldSkipRateLimit,
+    keyGenerator: (req) => req.user?.id ?? req.ip ?? 'anonymous',
+    message: {
+      error: 'Too many requests. Please wait a minute before trying again.',
+    },
+  });
+
   const authMiddleware = createAuthMiddleware(deps.verifyToken ?? defaultTokenVerifier);
 
   app.use(
@@ -84,16 +137,26 @@ export function createApp(deps: AppDependencies = {}): Express {
       getDocumentRepo,
       getIngestionService,
       maxUploadSizeMb: deps.maxUploadSizeMb,
+      uploadRateLimiter: aiEndpointLimiter,
     })
   );
 
   app.use(
     '/api/chat',
     authMiddleware,
+    aiEndpointLimiter,
     createChatRouter({
       getRagService,
     })
   );
+
+  app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (err instanceof CorsNotAllowedError) {
+      res.status(403).json({ error: err.message });
+      return;
+    }
+    next(err);
+  });
 
   return app;
 }

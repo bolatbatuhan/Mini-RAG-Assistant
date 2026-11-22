@@ -21,8 +21,16 @@ export interface RagServiceDeps {
   matchCount?: number;
 }
 
+export interface AnswerQuestionOptions {
+  documentId?: string;
+}
+
 export interface RagService {
-  answerQuestion(userId: string, question: string): Promise<ChatResponse>;
+  answerQuestion(
+    userId: string,
+    question: string,
+    options?: AnswerQuestionOptions
+  ): Promise<ChatResponse>;
 }
 
 const NO_CONTEXT_FALLBACK_MESSAGE =
@@ -32,14 +40,22 @@ export function createRagService(deps: RagServiceDeps): RagService {
   const { repo, ai, matchThreshold = 0.3, matchCount = 5 } = deps;
 
   return {
-    async answerQuestion(userId: string, question: string): Promise<ChatResponse> {
+    async answerQuestion(
+      userId: string,
+      question: string,
+      options: AnswerQuestionOptions = {}
+    ): Promise<ChatResponse> {
       const cleanedQuestion = question.trim();
       const queryEmbedding = await ai.embedQuery(cleanedQuestion);
 
-      const matchedChunks = await repo.matchChunks(queryEmbedding, userId, {
+      const rawMatchedChunks = await repo.matchChunks(queryEmbedding, userId, {
         matchThreshold,
-        matchCount,
+        matchCount: options.documentId ? matchCount * 3 : matchCount,
       });
+
+      const matchedChunks = options.documentId
+        ? rawMatchedChunks.filter((c) => c.documentId === options.documentId).slice(0, matchCount)
+        : rawMatchedChunks;
 
       if (matchedChunks.length === 0) {
         return {
