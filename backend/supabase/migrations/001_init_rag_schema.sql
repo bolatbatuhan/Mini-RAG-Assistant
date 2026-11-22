@@ -76,3 +76,10 @@ as $$
   order by dc.embedding <=> query_embedding
   limit match_count;
 $$;
+
+-- Least-privilege grants: only backend service_role accesses tables and RPC
+grant usage on schema public to service_role;
+grant all on table public.documents to service_role;
+grant all on table public.document_chunks to service_role;
+grant execute on function public.match_document_chunks(vector(768), uuid, float, int) to service_role;
+
