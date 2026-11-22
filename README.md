@@ -178,6 +178,8 @@ VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
 
 ### Adım 3: Bağımlılıkları Yükleme ve Çalıştırma
 
+#### Seçenek A — Doğrudan Node.js ile Çalıştırma
+
 ```bash
 # 1. Backend bağımlılıklarını yükle ve geliştirme sunucusunu başlat (http://localhost:4000)
 cd backend
@@ -189,6 +191,17 @@ cd frontend
 npm install
 npm run dev
 ```
+
+#### Seçenek B — Docker Compose ile Çalıştırma (İsteğe Bağlı)
+
+`backend/.env` ve `frontend/.env` dosyalarınızı hazırladıktan sonra tüm sistemi tek komutla konteyner olarak ayağa kaldırabilirsiniz:
+
+```bash
+docker compose --env-file ./frontend/.env up --build
+```
+
+- **Frontend (Nginx):** `http://localhost:5173`
+- **Backend (Express API):** `http://localhost:4000`
 
 ---
 
