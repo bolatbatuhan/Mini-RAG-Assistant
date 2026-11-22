@@ -7,10 +7,12 @@ let adminClient: SupabaseClient | null = null;
 export function getSupabaseAuthClient(): SupabaseClient {
   if (!authClient) {
     const env = getEnv();
-    authClient = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+    const key = env.SUPABASE_ANON_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
+    authClient = createClient(env.SUPABASE_URL, key, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
+        detectSessionInUrl: false,
       },
     });
   }
@@ -24,6 +26,7 @@ export function getSupabaseAdminClient(): SupabaseClient {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
+        detectSessionInUrl: false,
       },
     });
   }
