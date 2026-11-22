@@ -1,66 +1,68 @@
+[Türkçe Dokümantasyon](README.tr.md)
+
 # Mini RAG — Document Assistant
 
-Kullanıcıların PDF dokümanları yükleyip kendi bilgi tabanları üzerinde doğal dilde sorular sorabildiği, yalnızca yüklenen dokümanlardaki kaynaklara dayalı (grounded) ve kaynak alıntılı yanıtlar üreten uçtan uca **Full-Stack RAG (Retrieval-Augmented Generation)** uygulaması.
+An end-to-end **Full-Stack RAG (Retrieval-Augmented Generation)** application that enables authenticated users to upload PDF documents, index them into a vector database, and ask natural-language questions answered strictly from their uploaded documents with transparent source citations.
 
 ---
 
-## 1. Proje Amacı ve Özellikler
+## 1. Project Overview & Key Features
 
-- **Kimlik Doğrulama (Supabase Auth):** E-posta ve şifre ile kayıt olma, giriş yapma ve oturum yönetimi.
-- **PDF Doküman Yönetimi ve Senkron Ingestion:**
-  - Sürükle-bırak veya dosya seçici ile PDF yükleme (`POST /api/documents`).
-  - İstemci ve sunucu tarafında dosya türü (`.pdf` + `%PDF-` magic header) ve boyut doğrulaması (varsayılan maks. `10 MB`).
-  - PDF metin çıkarma (`pdf-parse`), örtüşmeli parçalama (`@langchain/textsplitters` — `RecursiveCharacterTextSplitter`) ve vektör üretimi (`@langchain/google-genai` — `text-embedding-004`, 768 boyut).
-  - Doküman işlenme durumları (`processing`, `completed`, `failed`), parça (chunk) sayısı görüntüleme ve onaylı doküman silme (`DELETE /api/documents/:id`).
-- **Kaynak Alıntılı RAG Sohbet (`POST /api/chat`):**
-  - Kullanıcı sorusunun vektöre dönüştürülmesi ve Supabase `pgvector` (`match_document_chunks` RPC) ile kosinüs benzerlik araması.
-  - Tüm dokümanlar üzerinde veya seçilen tek bir doküman kapsamında filtreli sorgulama.
-  - Yalnızca bulunan bağlama dayalı yanıt üretimi (`gemini-2.5-flash`) ve her yanıtın altında kaynak dosya adı, parça numarası (`Chunk #N`), benzerlik oranı ve ilgili metin kesitinin gösterimi.
-  - İlgili içerik bulunamadığında LLM halüsinasyonunu önleyen güvenli geri bildirim.
+- **Authentication (Supabase Auth):** Email and password registration, login, and JWT session management.
+- **PDF Document Management & Synchronous Ingestion:**
+  - Drag-and-drop or file picker PDF uploads (`POST /api/documents`).
+  - Client- and server-side file type (`.pdf` extension, MIME type, and `%PDF-` magic header signature) and size validation (default max `10 MB`).
+  - PDF text extraction (`pdf-parse`), overlapping text chunking (`@langchain/textsplitters` — `RecursiveCharacterTextSplitter`), and vector embedding generation (`@langchain/google-genai` — `text-embedding-004`, 768 dimensions).
+  - Document processing status tracking (`processing`, `completed`, `failed`), chunk count inspection (`GET /api/documents/:id`), and two-step confirmed document deletion (`DELETE /api/documents/:id`).
+- **Grounded RAG Chat with Citations (`POST /api/chat`):**
+  - Converts user questions into 768-dimensional query embeddings and performs cosine similarity search via Supabase `pgvector` (`match_document_chunks` RPC).
+  - Supports querying across all completed documents or filtering by a single selected document.
+  - Synthesizes grounded answers (`gemini-2.5-flash`) strictly from retrieved excerpts and displays collapsible source citations (filename, `Chunk #N`, similarity percentage, and text excerpt) beneath each response.
+  - Prevents LLM hallucinations by returning a deterministic fallback message without invoking the LLM when no relevant chunks exceed the similarity threshold.
 
 ---
 
-## 2. Teknoloji Yığını
+## 2. Technology Stack
 
-| Katman | Teknoloji | Kullanım Amacı |
+| Layer | Technology | Purpose |
 | --- | --- | --- |
-| **Frontend** | React 19 + TypeScript + Vite | Kullanıcı arayüzü, Auth akışı, Doküman ve RAG Chat panelleri |
-| **Backend** | Node.js + Express 5 + TypeScript | REST API, kimlik doğrulama, dosya doğrulama, RAG orkestrasyonu |
-| **Auth** | Supabase Auth | JWT tabanlı kullanıcı kaydı, girişi ve oturum doğrulaması |
-| **Veritabanı** | Supabase PostgreSQL + `pgvector` | Doküman, metin parçaları ve 768 boyutlu vektör saklama / benzerlik araması |
-| **AI / RAG** | LangChain.js (`@langchain/google-genai`, `@langchain/textsplitters`) | Metin parçalama, `text-embedding-004` embedding ve `gemini-2.5-flash` yanıt üretimi |
-| **Güvenlik & Doğrulama** | `helmet`, `cors`, `express-rate-limit`, `multer`, `zod` | HTTP güvenlik başlıkları, sıkı CORS, hız sınırlama ve şema doğrulama |
-| **Test & Kalite** | Vitest + Supertest + ESLint + TypeScript | Birim ve API entegrasyon testleri, statik tip ve kod kalitesi kontrolü |
-| **CI & Deployment** | GitHub Actions + Vercel + Render | Otomatik CI doğrulaması, Frontend (Vercel) ve Backend (Render) yayını |
+| **Frontend** | React 19 + TypeScript + Vite | SPA user interface, Auth flow, Document management, and RAG Chat UI |
+| **Backend** | Node.js + Express 5 + TypeScript | REST API, JWT authentication, file verification, and RAG orchestration |
+| **Authentication** | Supabase Auth | JWT-based user sign-up, sign-in, and access token verification |
+| **Database** | Supabase PostgreSQL + `pgvector` | Document metadata, text chunks, and 768-dim vector similarity search |
+| **AI / RAG** | LangChain.js (`@langchain/google-genai`, `@langchain/textsplitters`) | Text chunking, `text-embedding-004` embeddings, and `gemini-2.5-flash` chat completion |
+| **Security & Validation** | `helmet`, `cors`, `express-rate-limit`, `multer`, `zod` | HTTP security headers, strict CORS, rate limiting, and schema validation |
+| **Testing & Quality** | Vitest + Supertest + ESLint + TypeScript | Unit and API integration tests, static type checking, and linting |
+| **CI & Deployment** | GitHub Actions + Docker + Vercel + Render | Automated CI checks, Docker build verification, Vercel (Frontend), and Render (Backend) |
 
 ---
 
-## 3. Sistem Mimarisi ve Veri Akışı
+## 3. System Architecture & Data Flow
 
 ```mermaid
 flowchart TD
     subgraph Frontend ["React + Vite + TypeScript (Vercel)"]
-        UI_Auth["Giriş / Kayıt Ekranı (Supabase Auth)"]
-        UI_Docs["Doküman Yönetim Paneli (PDF Yükle / Listele / Sil)"]
-        UI_Chat["RAG Sohbet Paneli (Soru-Cevap + Kaynak Alıntıları)"]
+        UI_Auth["Login / Register Screen (Supabase Auth)"]
+        UI_Docs["Documents Panel (Upload / List / Inspect / Delete PDFs)"]
+        UI_Chat["RAG Chat Panel (Q&A + Source Citations)"]
     end
 
     subgraph Backend ["Node.js + Express + TypeScript (Render)"]
         MW_Security["Helmet + Strict CORS + Rate Limiter"]
         MW_Auth["Supabase JWT Auth Middleware"]
-        Svc_Ingest["Ingestion Servisi (pdf-parse + RecursiveCharacterTextSplitter)"]
-        Svc_RAG["RAG Servisi (Query Embedding + Grounded Prompt)"]
+        Svc_Ingest["Ingestion Service (pdf-parse + RecursiveCharacterTextSplitter)"]
+        Svc_RAG["RAG Service (Query Embedding + Grounded Prompt)"]
     end
 
-    subgraph External ["Harici Servisler"]
+    subgraph External ["External Services"]
         Supa_Auth["Supabase Auth"]
         Supa_DB[("Supabase PostgreSQL + pgvector")]
         Gemini["Google Gemini API (text-embedding-004 & gemini-2.5-flash)"]
     end
 
-    UI_Auth <-->|"JWT Oturumu"| Supa_Auth
+    UI_Auth <-->|"JWT Session"| Supa_Auth
     UI_Docs -->|"Bearer Token + PDF"| MW_Security
-    UI_Chat -->|"Bearer Token + Soru"| MW_Security
+    UI_Chat -->|"Bearer Token + Question"| MW_Security
     MW_Security --> MW_Auth
     MW_Auth -->|"auth.getUser(token)"| Supa_Auth
     MW_Auth --> Svc_Ingest
@@ -72,92 +74,92 @@ flowchart TD
     Svc_RAG -->|"Grounded Context + Question"| Gemini
 ```
 
-### 3.1. Ingestion Pipeline (Doküman Yükleme Akışı)
+### 3.1. Ingestion Pipeline (Document Upload Flow)
 
 ```text
 React UI
   │  POST /api/documents (Bearer JWT + multipart/form-data PDF)
   ▼
-Express API (Auth Middleware + Rate Limiter + Multer + %PDF- Magic Header Kontrolü)
+Express API (Auth Middleware + Rate Limiter + Multer + %PDF- Magic Header Check)
   │
-  ├─► 1. documents tablosuna status='processing' kaydı açılır
-  ├─► 2. pdf-parse ile PDF içerisinden ham metin çıkarılır
-  ├─► 3. RecursiveCharacterTextSplitter ile metin parçalara (1000 karakter, 200 overlap) bölünür
-  ├─► 4. Gemini text-embedding-004 ile her parça için 768 boyutlu vektör üretilir
-  ├─► 5. document_chunks tablosuna metin, vektör ve metadata kaydedilir
-  └─► 6. documents.status = 'completed' (hata durumunda 'failed' + error_message) güncellenir
+  ├─► 1. Insert initial record in `documents` table with status='processing'
+  ├─► 2. Extract raw text from PDF buffer using `pdf-parse`
+  ├─► 3. Split text into overlapping chunks (1000 chars, 200 overlap) via `RecursiveCharacterTextSplitter`
+  ├─► 4. Generate 768-dimensional vector embeddings for each chunk via Gemini `text-embedding-004`
+  ├─► 5. Bulk-insert chunk text, embeddings, and metadata into `document_chunks`
+  └─► 6. Update `documents.status` to 'completed' (or 'failed' + `error_message` on error)
 ```
 
-### 3.2. RAG Query Pipeline (Soru-Cevap Akışı)
+### 3.2. RAG Query Pipeline (Question-Answering Flow)
 
 ```text
 React UI
   │  POST /api/chat (Bearer JWT + { question, documentId? })
   ▼
-Express API (Auth Middleware + Rate Limiter + Zod Şema Doğrulaması)
+Express API (Auth Middleware + Rate Limiter + Zod Schema Validation)
   │
-  ├─► 1. Soru metni için Gemini text-embedding-004 ile 768 boyutlu sorgu vektörü üretilir
-  ├─► 2. pgvector match_document_chunks RPC fonksiyonu yalnızca req.user.id'ye ait
-  │      ve status='completed' olan doküman parçaları arasında kosinüs benzerlik araması yapar
-  ├─► 3. Eşik değerinin (0.3) üzerinde eşleşen parça yoksa LLM çağrılmaz; güvenli uyarı döner
-  ├─► 4. Eşleşen parçalar kaynak etiketleriyle ([Source N | Document | Chunk #]) prompt'a eklenir
-  ├─► 5. Gemini 2.5 Flash yalnızca verilen bağlama dayanarak yanıt üretir
-  └─► 6. Yanıt (answer) ve kaynak referansları (sources) frontend'e döndürülür
+  ├─► 1. Generate a 768-dimensional query embedding via Gemini `text-embedding-004`
+  ├─► 2. Execute `match_document_chunks` pgvector RPC scoped strictly to `req.user.id`
+  │      and `documents.status = 'completed'` using cosine similarity
+  ├─► 3. If no chunks meet the similarity threshold (0.3), skip the LLM call and return a safe fallback message
+  ├─► 4. Format retrieved chunks with source tags ([Source N | Document | Chunk #]) into a grounded prompt
+  ├─► 5. Generate an answer with Gemini 2.5 Flash constrained strictly to the provided excerpts
+  └─► 6. Return `{ answer, sources }` to the frontend for rendering
 ```
 
 ---
 
-## 4. Uygulanan Güvenlik Katmanları (Defense-in-Depth)
+## 4. Security Layers (Defense-in-Depth)
 
-1. **JWT Doğrulama (`createAuthMiddleware`):** İstemciden gelen hiçbir kullanıcı kimliğine (`user_id`) güvenilmez. Her istekte `Authorization: Bearer <token>` başlığı Supabase `auth.getUser(token)` ile doğrulanır.
-2. **IDOR (Insecure Direct Object Reference) Koruması:** Tüm `SELECT`, `UPDATE`, `DELETE` ve `pgvector` RPC (`match_document_chunks`) sorguları sunucu tarafında `user_id = req.user.id` koşuluyla sınırlandırılmıştır. Bir kullanıcı başka bir kullanıcının dokümanını görüntüleyemez, silemez veya sorgulayamaz (`404 Not Found`).
-3. **Supabase Row Level Security (RLS):** Veritabanı seviyesinde `documents` ve `document_chunks` tablolarında `auth.uid() = user_id` RLS politikaları aktiftir.
-4. **Çok Katmanlı PDF Dosya Doğrulaması:** Yalnızca dosya uzantısına (`.pdf`) veya `Content-Type` (`application/pdf`) başlığına güvenilmez; dosyanın ilk 5 baytının `%PDF-` magic header imzasına sahip olduğu sunucu belleğinde doğrulanır ve maksimum dosya boyutu (`MAX_UPLOAD_SIZE_MB`) sınırlandırılır.
-5. **Grounded Prompting & Halüsinasyon Önleme:** Benzerlik aramasında eşik değerini geçen kaynak parça bulunamadığında LLM hiç çağrılmaz. Kaynak bulunduğunda ise sistem talimatı modeli yalnızca verilen metin kesitlerini kullanmaya zorlar.
-6. **Rate Limiting (`express-rate-limit`):** `/api/chat` ve `POST /api/documents` uç noktaları, API kota sömürüsüne ve kötüye kullanıma karşı kullanıcı/IP başına dakikada maksimum 20 istek ile sınırlandırılmıştır (`429 Too Many Requests`).
-7. **Sıkı CORS ve Güvenlik Başlıkları (`helmet`):** Backend yalnızca `ALLOWED_ORIGIN` ortam değişkeninde tanımlanan origin'lerden gelen tarayıcı isteklerine izin verir; yetkisiz origin'leri `403 Not allowed by CORS` ile reddeder.
-8. **Gizli Anahtar İzolasyonu:** `SUPABASE_SERVICE_ROLE_KEY` ve `GEMINI_API_KEY` yalnızca backend ortam değişkenlerinde tutulur; frontend paketine kesinlikle dahil edilmez.
+1. **Server-Side JWT Verification (`createAuthMiddleware`):** The backend never trusts client-supplied user IDs. Every protected request validates the `Authorization: Bearer <token>` header against Supabase `auth.getUser(token)`.
+2. **IDOR (Insecure Direct Object Reference) Prevention:** Every `SELECT`, `UPDATE`, `DELETE`, and `pgvector` RPC (`match_document_chunks`) call explicitly filters by `user_id = req.user.id`. Attempting to read, delete, or query another user's document returns `404 Not Found`.
+3. **Supabase Row Level Security (RLS):** Database-level RLS policies (`auth.uid() = user_id`) are enabled on both `documents` and `document_chunks` tables as defense-in-depth.
+4. **Multi-Layered PDF Verification:** Beyond checking the `.pdf` extension and `application/pdf` MIME type, the server inspects the first 5 bytes of the uploaded buffer for the `%PDF-` magic header signature and enforces a strict file size limit (`MAX_UPLOAD_SIZE_MB`).
+5. **Grounded Prompting & Hallucination Guardrails:** When similarity search returns zero matching chunks above threshold, the LLM is not invoked. When context is present, system instructions require the model to answer exclusively from the provided excerpts.
+6. **Rate Limiting (`express-rate-limit`):** `POST /api/chat` and `POST /api/documents` are protected by a per-user/IP rate limiter (default max 20 requests per minute) to prevent quota exhaustion and abuse (`429 Too Many Requests`).
+7. **Strict CORS & Security Headers (`helmet`):** The API only permits cross-origin browser requests from origins listed in `ALLOWED_ORIGIN` and rejects unauthorized origins with `403 Not allowed by CORS`.
+8. **Secret Isolation:** `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` reside exclusively in backend environment variables and are never exposed to the frontend bundle.
 
 ---
 
-## 5. API Uç Noktaları
+## 5. API Endpoints
 
-Tüm `/api/*` uç noktaları `Authorization: Bearer <supabase_access_token>` başlığı gerektirir.
+All `/api/*` endpoints require an `Authorization: Bearer <supabase_access_token>` header.
 
-| Metot | Uç Nokta | Açıklama |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Servis sağlık kontrolü (`{ "status": "ok" }`) |
-| `POST` | `/api/documents` | PDF dosyası yükler (`multipart/form-data`, alan adı: `file`) ve ingestion başlatır |
-| `GET` | `/api/documents` | Oturum açmış kullanıcının dokümanlarını listeler |
-| `GET` | `/api/documents/:id` | Kullanıcıya ait dokümanın detayını ve toplam `chunkCount` bilgisini döndürür |
-| `DELETE` | `/api/documents/:id` | Kullanıcıya ait dokümanı ve ilişkili tüm `document_chunks` kayıtlarını siler |
-| `POST` | `/api/chat` | `{ "question": "...", "documentId"?: "..." }` ile dokümanlar üzerinde RAG sorgusu çalıştırır |
+| `GET` | `/health` | Health check endpoint (`{ "status": "ok" }`) |
+| `POST` | `/api/documents` | Upload a PDF (`multipart/form-data`, field name: `file`) and run synchronous ingestion |
+| `GET` | `/api/documents` | List all documents belonging to the authenticated user |
+| `GET` | `/api/documents/:id` | Retrieve document details including total `chunkCount` |
+| `DELETE` | `/api/documents/:id` | Delete a user-owned document and cascade-delete its `document_chunks` |
+| `POST` | `/api/chat` | Ask a question across uploaded documents (`{ "question": "...", "documentId"?: "..." }`) |
 
 ---
 
-## 6. Yerel Kurulum Adımları
+## 6. Local Setup Instructions
 
-### Ön Gereksinimler
+### Prerequisites
 
-- **Node.js** 20+ (veya 22/24 LTS) ve **npm**
-- Bir **Supabase** projesi (ücretsiz katman yeterlidir)
-- Bir **Google AI Studio (Gemini)** API anahtarı (`GEMINI_API_KEY`)
+- **Node.js** 20+ (or 22/24 LTS) and **npm**
+- A **Supabase** project (free tier works out of the box)
+- A **Google AI Studio (Gemini)** API key (`GEMINI_API_KEY`)
 
-### Adım 1: Veritabanı Şemasını Oluşturma (Supabase)
+### Step 1: Initialize the Supabase Database Schema
 
-1. Supabase Dashboard → **SQL Editor** ekranını açın.
-2. [backend/supabase/migrations/001_init_rag_schema.sql](backend/supabase/migrations/001_init_rag_schema.sql) dosyasındaki SQL komutlarını yapıştırıp çalıştırın (`vector` eklentisini, `documents` ve `document_chunks` tablolarını, RLS politikalarını ve `match_document_chunks` fonksiyonunu oluşturur).
+1. Open your Supabase Dashboard → **SQL Editor**.
+2. Paste and run the contents of [backend/supabase/migrations/001_init_rag_schema.sql](backend/supabase/migrations/001_init_rag_schema.sql) (enables `pgvector`, creates `documents` and `document_chunks` tables, enables RLS policies, and defines the `match_document_chunks` RPC function).
 
-### Adım 2: Ortam Değişkenlerini Yapılandırma
+### Step 2: Configure Environment Variables
 
 **Backend (`backend/.env`):**
 
-`backend/.env.example` dosyasını `backend/.env` olarak kopyalayın ve değerleri doldurun:
+Copy `backend/.env.example` to `backend/.env` and fill in your credentials:
 
 ```env
 PORT=4000
 ALLOWED_ORIGIN=http://localhost:5173
-SUPABASE_URL=https://<proje-id>.supabase.co
+SUPABASE_URL=https://<project-id>.supabase.co
 SUPABASE_ANON_KEY=<supabase-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<supabase-service-role-key>
 GEMINI_API_KEY=<google-gemini-api-key>
@@ -168,33 +170,33 @@ MAX_UPLOAD_SIZE_MB=10
 
 **Frontend (`frontend/.env`):**
 
-`frontend/.env.example` dosyasını `frontend/.env` olarak kopyalayın ve değerleri doldurun:
+Copy `frontend/.env.example` to `frontend/.env` and fill in your configuration:
 
 ```env
 VITE_API_BASE_URL=http://localhost:4000
-VITE_SUPABASE_URL=https://<proje-id>.supabase.co
+VITE_SUPABASE_URL=https://<project-id>.supabase.co
 VITE_SUPABASE_ANON_KEY=<supabase-anon-key>
 ```
 
-### Adım 3: Bağımlılıkları Yükleme ve Çalıştırma
+### Step 3: Install Dependencies & Run
 
-#### Seçenek A — Doğrudan Node.js ile Çalıştırma
+#### Option A — Run Directly with Node.js
 
 ```bash
-# 1. Backend bağımlılıklarını yükle ve geliştirme sunucusunu başlat (http://localhost:4000)
+# 1. Install backend dependencies and start the dev server (http://localhost:4000)
 cd backend
 npm install
 npm run dev
 
-# 2. Yeni bir terminalde Frontend bağımlılıklarını yükle ve başlat (http://localhost:5173)
+# 2. In a separate terminal, install frontend dependencies and start Vite (http://localhost:5173)
 cd frontend
 npm install
 npm run dev
 ```
 
-#### Seçenek B — Docker Compose ile Çalıştırma (İsteğe Bağlı)
+#### Option B — Run with Docker Compose (Optional)
 
-`backend/.env` ve `frontend/.env` dosyalarınızı hazırladıktan sonra tüm sistemi tek komutla konteyner olarak ayağa kaldırabilirsiniz:
+Once `backend/.env` and `frontend/.env` are configured, build and start both containers with a single command:
 
 ```bash
 docker compose --env-file ./frontend/.env up --build
@@ -205,16 +207,16 @@ docker compose --env-file ./frontend/.env up --build
 
 ---
 
-## 7. Test ve Kalite Kontrolleri
+## 7. Testing & Quality Checks
 
 ```bash
-# Backend: TypeScript tip kontrolü, ESLint, Vitest testleri ve prod build
+# Backend: TypeScript typecheck, ESLint, Vitest test suite, and production build
 npm --prefix backend run typecheck
 npm --prefix backend run lint
 npm --prefix backend test
 npm --prefix backend run build
 
-# Frontend: TypeScript tip kontrolü, ESLint ve Vite prod build
+# Frontend: TypeScript typecheck, ESLint, and Vite production build
 npm --prefix frontend run typecheck
 npm --prefix frontend run lint
 npm --prefix frontend run build
@@ -222,28 +224,28 @@ npm --prefix frontend run build
 
 ---
 
-## 8. Canlıya Alma (Deployment Rehberi)
+## 8. Deployment Guide
 
-### 8.1. Backend Yayını (Render)
+### 8.1. Backend Deployment (Render)
 
-1. Render üzerinde yeni bir **Web Service** oluşturun ve GitHub deponuzu bağlayın.
+1. Create a new **Web Service** on Render connected to your GitHub repository.
 2. **Root Directory:** `backend`
 3. **Build Command:** `npm ci && npm run build`
 4. **Start Command:** `npm start`
 5. **Environment Variables:**
    - `NODE_ENV=production`
-   - `ALLOWED_ORIGIN=https://<vercel-frontend-adresiniz>.vercel.app`
+   - `ALLOWED_ORIGIN=https://<your-vercel-frontend-domain>.vercel.app`
    - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
    - `GEMINI_API_KEY`, `GEMINI_EMBEDDING_MODEL=text-embedding-004`, `GEMINI_CHAT_MODEL=gemini-2.5-flash`
    - `MAX_UPLOAD_SIZE_MB=10`
 
-### 8.2. Frontend Yayını (Vercel)
+### 8.2. Frontend Deployment (Vercel)
 
-1. Vercel üzerinde yeni bir proje oluşturun ve GitHub deponuzu seçin.
+1. Import your GitHub repository into a new Vercel project.
 2. **Root Directory:** `frontend`
 3. **Framework Preset:** `Vite`
 4. **Build Command:** `npm run build` / **Output Directory:** `dist`
 5. **Environment Variables:**
-   - `VITE_API_BASE_URL=https://<render-backend-adresiniz>.onrender.com`
-   - `VITE_SUPABASE_URL=https://<proje-id>.supabase.co`
+   - `VITE_API_BASE_URL=https://<your-render-backend-domain>.onrender.com`
+   - `VITE_SUPABASE_URL=https://<project-id>.supabase.co`
    - `VITE_SUPABASE_ANON_KEY=<supabase-anon-key>`
