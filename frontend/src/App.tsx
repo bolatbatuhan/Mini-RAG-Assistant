@@ -1,8 +1,43 @@
+import { useCallback, useEffect, useState } from 'react';
 import { AuthForm } from './components/AuthForm.tsx';
+import { ChatPanel } from './components/ChatPanel.tsx';
+import { DocumentsPanel } from './components/DocumentsPanel.tsx';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
+import { listDocuments } from './lib/api.ts';
+import type { DocumentItem } from './types/api.ts';
 
 function WorkspaceContent() {
   const { user, loading, signOut } = useAuth();
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [docsError, setDocsError] = useState<string | null>(null);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string>('');
+
+  const refreshDocuments = useCallback(async () => {
+    if (!user) {
+      setDocuments([]);
+      return;
+    }
+    setDocsLoading(true);
+    setDocsError(null);
+    try {
+      const items = await listDocuments();
+      setDocuments(items);
+    } catch (err) {
+      setDocsError(err instanceof Error ? err.message : 'Dokümanlar alınamadı.');
+    } finally {
+      setDocsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      void refreshDocuments();
+    } else {
+      setDocuments([]);
+      setSelectedDocumentId('');
+    }
+  }, [user, refreshDocuments]);
 
   if (loading) {
     return (
@@ -37,12 +72,22 @@ function WorkspaceContent() {
         </div>
       </header>
 
-      <section className="workspace-placeholder">
-        <p>
-          Oturum açıldı (<strong>{user.email}</strong>). Doküman yönetimi ve RAG sohbet ekranı
-          bir sonraki adımda (Task 13) bu alana eklenecektir.
-        </p>
-      </section>
+      <div className="workspace-grid">
+        <DocumentsPanel
+          documents={documents}
+          loading={docsLoading}
+          error={docsError}
+          selectedDocumentId={selectedDocumentId}
+          onSelectDocumentId={setSelectedDocumentId}
+          onRefresh={refreshDocuments}
+        />
+
+        <ChatPanel
+          documents={documents}
+          selectedDocumentId={selectedDocumentId}
+          onSelectDocumentId={setSelectedDocumentId}
+        />
+      </div>
     </main>
   );
 }
