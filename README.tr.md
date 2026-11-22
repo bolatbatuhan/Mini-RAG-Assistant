@@ -1,4 +1,14 @@
+[English Documentation](README.md) | **[🚀 Canlı Demo](https://mini-rag-assistant-ddnb.vercel.app/)**
+
 # Mini RAG — Document Assistant
+
+[![Canlı Demo](https://img.shields.io/badge/Canl%C4%B1_Demo-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://mini-rag-assistant-ddnb.vercel.app/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Express](https://img.shields.io/badge/Express-5.0-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-pgvector-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+
+> **Canlı Uygulama (Live Demo):** [https://mini-rag-assistant-ddnb.vercel.app/](https://mini-rag-assistant-ddnb.vercel.app/)
 
 Kullanıcıların PDF dokümanları yükleyip kendi bilgi tabanları üzerinde doğal dilde sorular sorabildiği, yalnızca yüklenen dokümanlardaki kaynaklara dayalı (grounded) ve kaynak alıntılı yanıtlar üreten uçtan uca **Full-Stack RAG (Retrieval-Augmented Generation)** uygulaması.
 
